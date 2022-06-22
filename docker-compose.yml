@@ -1,0 +1,77 @@
+version: '3'
+
+services:
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: doc-ex-frontend
+    command: serve -s build -l 3000
+    restart: unless-stopped
+    networks:
+      - doc-ex-network    
+
+  api: 
+    build: ./api
+    container_name: doc-ex-api
+    command: npm run start
+    ports: ["3001:3001"]
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - MONGO_URL=mongodb://api_db:27017/api
+      - AUTH_URL=http://auth:3002
+    depends_on:
+      - api_db
+    networks:
+      - doc-ex-network      
+
+  auth: 
+    build: ./auth
+    container_name: doc-ex-auth
+    command: npm run start
+    ports: ["3002:3002"]
+    restart: unless-stopped
+    environment:
+      - PORT=3002
+      - MONGO_URL=mongodb://api_db:27017/auth
+    depends_on:
+      - auth_db
+    networks:
+      - doc-ex-network      
+
+
+  api_db: 
+    image: mongo:latest
+    volumes: 
+      - mongoldb_api:/data/db
+    networks:
+      - doc-ex-network            
+
+  auth_db: 
+    image: mongo:latest
+    volumes: 
+      - mongoldb_auth:/data/db
+    networks:
+      - doc-ex-network            
+
+  nginx:
+    depends_on:
+      - frontend
+      - api
+      - auth
+    restart: unless-stopped
+    build:
+      dockerfile: Dockerfile
+      context: ./nginx
+    ports: ["80:80"]
+    networks:
+      - doc-ex-network
+
+volumes:
+  mongoldb_api:
+  mongoldb_auth:
+
+networks:
+  doc-ex-network:
+    driver: bridge
